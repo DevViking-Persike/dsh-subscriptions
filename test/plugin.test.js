@@ -205,6 +205,17 @@ function describe_session() {
     await assert.rejects(session.access(), err => err.code === 'INVALID_CREDENTIAL')
   })
 
+  test('status flags an expired token instead of presenting it as healthy', async () => {
+    const file = join(scratchHome(), 'cred.json')
+    await writeCredential(file, { access: 'a', refresh: 'r', expires: Date.now() - 1000, accountId: '', email: '' })
+    const session = createSession({ spec: SPEC, filename: file })
+
+    const status = await session.status()
+
+    assert.equal(status.connected, true)
+    assert.equal(status.expired, true)
+  })
+
   test('status reports connection without exposing the token', async () => {
     const file = join(scratchHome(), 'cred.json')
     await writeCredential(file, { access: 'secret-token', refresh: 'r', expires: Date.now() + 3_600_000, accountId: '', email: 'a@b' })
@@ -213,6 +224,8 @@ function describe_session() {
     const status = await session.status()
 
     assert.equal(status.connected, true)
+    // A stored-but-expired token reports as such, not as healthy.
+    assert.equal(status.expired, false)
     assert.equal(status.email, 'a@b')
     assert.equal(JSON.stringify(status).includes('secret-token'), false, 'the token leaked into status')
   })

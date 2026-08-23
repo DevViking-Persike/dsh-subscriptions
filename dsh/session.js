@@ -142,6 +142,11 @@ function createSession({ spec, filename, log, accountFrom }) {
     }
     return {
       connected: credential !== undefined,
+      // A document can exist while its access token is already expired. The
+      // route may still refresh it, but the status page must not present that
+      // state as healthy — especially after an invalid_grant proves the
+      // refresh token is gone too.
+      expired: credential !== undefined && credential.expires <= Date.now(),
       pending: loginFlow !== undefined,
       ...credential === undefined ? {} : { expiresAt: new Date(credential.expires).toISOString() },
       ...credential?.email ? { email: credential.email } : {},
