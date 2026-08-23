@@ -78,9 +78,22 @@ async function tokenRequest(spec, body, signal) {
   }
   if (!response.ok) {
     const detail = redact(await response.text().catch(() => ''))
+    // A rejected grant answers HTTP 400, not 401: status alone would classify
+    // a revoked refresh token as a retryable transport fault, and every model
+    // call would then re-attempt the refresh three times — a storm that ends
+    // with the endpoint rate-limiting the address. The error code names the
+    // terminal cases; everything else keeps its transport classification.
+    let grant = ''
+    try {
+      grant = String(JSON.parse(detail)?.error ?? '')
+    } catch {
+      // A non-JSON body keeps the transport classification.
+    }
+    const terminal = response.status === 401 || response.status === 403
+      || ['invalid_grant', 'invalid_client', 'unauthorized_client'].includes(grant)
     throw new SubscriptionError(
       `${spec.label} token request failed (HTTP ${String(response.status)}): ${detail}`,
-      response.status === 401 || response.status === 403 ? 'AUTH' : 'TRANSPORT',
+      terminal ? 'AUTH' : 'TRANSPORT',
       { status: response.status },
     )
   }

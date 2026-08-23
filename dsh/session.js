@@ -20,6 +20,16 @@ const { authorizeUrl, decodeJwtPayload, pkce, tokenRequest, waitForBrowserCallba
 const REFRESH_INTERVAL_MS = 300_000
 
 /**
+ * How long a terminally rejected refresh blocks later attempts.
+ *
+ * The model-call retry policy treats a failed refresh as one more attempt to
+ * redo; without a cooldown, three retries mean three refresh POSTs against an
+ * endpoint that just said the grant is dead, and enough of those earn a
+ * rate limit that also blocks the next real sign-in.
+ */
+const REFRESH_COOLDOWN_MS = 60_000
+
+/**
  * Create one subscription session.
  *
  * @param {object} deps - `spec` (protocol constants), `filename`, `log`, and
@@ -29,6 +39,8 @@ const REFRESH_INTERVAL_MS = 300_000
 function createSession({ spec, filename, log, accountFrom }) {
   let loginFlow
   let lastLoginError
+  let refreshRejectedAt
+  let lastRefreshError
 
   /**
    * Return a usable access token, refreshing near expiry.
@@ -38,6 +50,12 @@ function createSession({ spec, filename, log, accountFrom }) {
    *   no credential is stored.
    */
   async function access(signal) {
+    // A refresh rejected moments ago is still rejected: re-raise without
+    // touching the endpoint, so the model-call retry policy cannot turn one
+    // dead grant into a request storm.
+    if (refreshRejectedAt !== undefined && Date.now() - refreshRejectedAt < REFRESH_COOLDOWN_MS) {
+      throw lastRefreshError
+    }
     return withFileLock(filename, async () => {
       const current = await readCredential(filename)
       if (current === undefined) return undefined
@@ -45,11 +63,26 @@ function createSession({ spec, filename, log, accountFrom }) {
       if (!needsRefresh(current)) {
         return { token: current.access, accountId: current.accountId, email: current.email }
       }
-      const next = await tokenRequest(spec, new URLSearchParams({
-        grant_type: 'refresh_token',
-        refresh_token: current.refresh,
-        client_id: spec.clientId,
-      }), signal)
+      let next
+      try {
+        next = await tokenRequest(spec, new URLSearchParams({
+          grant_type: 'refresh_token',
+          refresh_token: current.refresh,
+          client_id: spec.clientId,
+        }), signal)
+      } catch (error) {
+        // A terminal rejection (revoked grant, bad client) repeats identically
+        // on the next call, so it enters the cooldown; anything transport-side
+        // may clear on its own and does not.
+        if (error?.code === 'AUTH') {
+          refreshRejectedAt = Date.now()
+          lastRefreshError = error
+        }
+        throw error
+      }
+      // A success clears any recorded rejection.
+      refreshRejectedAt = undefined
+      lastRefreshError = undefined
       const stored = {
         access: next.access,
         // The endpoint may omit a rotated refresh token; the old one stays

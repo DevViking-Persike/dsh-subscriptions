@@ -156,6 +156,41 @@ function describe_session() {
     } finally { globalThis.fetch = original }
   })
 
+  test('a terminal refresh rejection is not retried within the cooldown', async () => {
+    // The model-call retry policy treats a failed refresh as one more
+    // attempt to redo; without a cooldown, three retries mean three POSTs
+    // against an endpoint that just said the grant is dead — the storm that
+    // earns a rate limit which then blocks the next real sign-in too.
+    const file = join(scratchHome(), 'cred.json')
+    await writeCredential(file, { access: 'old', refresh: 'r', expires: Date.now() + 60_000, accountId: '', email: '' })
+    const session = createSession({ spec: SPEC, filename: file })
+    let calls = 0
+    const original = globalThis.fetch
+    globalThis.fetch = () => { calls += 1; return Promise.resolve(new Response('{"error":"invalid_grant"}', { status: 400 })) }
+    try {
+      await assert.rejects(session.access(), err => err.code === 'AUTH')
+      await assert.rejects(session.access(), err => err.code === 'AUTH')
+      await assert.rejects(session.access(), err => err.code === 'AUTH')
+
+      assert.equal(calls, 1, 'the endpoint should have been hit exactly once')
+    } finally { globalThis.fetch = original }
+  })
+
+  test('a transport-side refresh failure does not enter the cooldown', async () => {
+    const file = join(scratchHome(), 'cred.json')
+    await writeCredential(file, { access: 'old', refresh: 'r', expires: Date.now() + 60_000, accountId: '', email: '' })
+    const session = createSession({ spec: SPEC, filename: file })
+    let calls = 0
+    const original = globalThis.fetch
+    globalThis.fetch = () => { calls += 1; return Promise.resolve(new Response('server busy', { status: 503 })) }
+    try {
+      await assert.rejects(session.access(), err => err.code === 'TRANSPORT')
+      await assert.rejects(session.access(), err => err.code === 'TRANSPORT')
+
+      assert.equal(calls, 2, 'a transient failure must stay retryable')
+    } finally { globalThis.fetch = original }
+  })
+
   test('a failed refresh leaves the credential in place', async () => {
     // A transient outage must not force a full re-login.
     const file = join(scratchHome(), 'cred.json')
