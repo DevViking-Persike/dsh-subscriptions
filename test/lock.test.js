@@ -74,17 +74,50 @@ test('the lock is released even when the operation throws', async () => {
   assert.equal(existsSync(`${file}.lock`), false)
 })
 
-test('a contender times out instead of stealing a foreign lock', async () => {
+test('a lock whose pid is dead is recovered, not fatal', async () => {
+  // The real-world case this plugin hit: an owner crashed between creating
+  // the lock and using it, and every later refresh failed on its corpse.
   const file = scratch()
-  writeFileSync(`${file}.lock`, '99999\n', { mode: 0o600 })
+  const deadPid = findDeadPid()
+  writeFileSync(`${file}.lock`, `${String(deadPid)}\n`, { mode: 0o600 })
+
+  // The contender waits out the deadline, proves the owner is gone, and
+  // takes over rather than leaving the credential unwritable forever.
+  assert.equal(await withFileLock(file, () => Promise.resolve('ok')), 'ok')
+  assert.equal(existsSync(`${file}.lock`), false)
+})
+
+test('an empty lock is recovered as a crash between create and write', async () => {
+  const file = scratch()
+  writeFileSync(`${file}.lock`, '', { mode: 0o600 })
+
+  assert.equal(await withFileLock(file, () => Promise.resolve('ok')), 'ok')
+  assert.equal(existsSync(`${file}.lock`), false)
+})
+
+test('a lock owned by a live pid still times out', async () => {
+  const file = scratch()
+  // Our own pid: alive by definition, and never stolen.
+  writeFileSync(`${file}.lock`, `${String(process.pid)}\n`, { mode: 0o600 })
 
   const started = Date.now()
   await assert.rejects(withFileLock(file, () => Promise.resolve()), /timed out waiting for the writer lock/)
 
-  // File age cannot prove the owner died, so the lock stays put.
   assert.ok(Date.now() - started >= 1900, 'should have waited out the deadline')
   assert.equal(existsSync(`${file}.lock`), true)
 })
+
+/** A pid that certainly does not exist right now. */
+function findDeadPid() {
+  for (let pid = 40000; pid < 41000; pid += 1) {
+    try {
+      process.kill(pid, 0)
+    } catch (error) {
+      if (error?.code === 'ESRCH') return pid
+    }
+  }
+  throw new Error('no dead pid found in range')
+}
 
 test('an atomic write leaves owner-only permissions', async () => {
   const file = scratch()

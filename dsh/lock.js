@@ -9,7 +9,7 @@
 // half and a reader can observe a half-written credential.
 
 const { randomBytes } = require('node:crypto')
-const { lstat, mkdir, rename, rm, writeFile } = require('node:fs/promises')
+const { lstat, mkdir, readFile, rename, rm, writeFile } = require('node:fs/promises')
 const { dirname } = require('node:path')
 
 /**
@@ -72,10 +72,46 @@ async function isLockContention(error, lockPath) {
 }
 
 /**
+ * Whether the lock's owner is provably dead.
+ *
+ * A lock older than the whole retry deadline settles the question two ways.
+ * An EMPTY lock means its owner died between the exclusive create and the pid
+ * write — that window is microseconds, so two seconds of emptiness is a
+ * corpse. A lock carrying a pid is dead when that pid is gone, which the
+ * zero-signal probe reports as ESRCH. A recycled pid still reads as alive, so
+ * it falls through to the timeout rather than being stolen.
+ *
+ * @param {string} lockPath - the lock sibling.
+ * @returns {Promise<boolean>}
+ */
+async function ownerIsDead(lockPath) {
+  let text = ''
+  try {
+    text = (await readFile(lockPath, 'utf8')).trim()
+  } catch {
+    return false
+  }
+  if (text.length === 0) return true
+  if (!/^\d+$/.test(text)) return false
+  const pid = Number(text)
+  // Pid 0 and negatives address process groups; never probe them.
+  if (pid <= 1 || pid === process.pid) return false
+  try {
+    process.kill(pid, 0)
+    return false
+  } catch (error) {
+    return error?.code === 'ESRCH'
+  }
+}
+
+/**
  * Hold the cross-process writer lock around one operation.
  *
- * The contender never removes an existing lock: file age cannot prove its
- * owner stopped, so orphan recovery stays an operator action.
+ * A contender waits out the retry deadline and fails if the lock is still
+ * held; a lock whose owner is provably dead (see {@link ownerIsDead}) is
+ * removed and retried once, because a crash must not leave the credential
+ * permanently unwritable. File age alone still proves nothing — an occupied
+ * lock is never stolen on age.
  *
  * @param {string} filename - the file whose writers this serializes.
  * @param {() => Promise<unknown>} operation - the read-modify-write cycle.
@@ -83,21 +119,34 @@ async function isLockContention(error, lockPath) {
  */
 async function withFileLock(filename, operation) {
   const lockPath = `${filename}.lock`
-  const deadline = Date.now() + LOCK_TIMEOUT_MS
-  let delay = LOCK_RETRY_INITIAL_MS
-  for (;;) {
-    try {
-      await writeFile(lockPath, `${String(process.pid)}\n`, { mode: 0o600, flag: 'wx' })
-      break
-    } catch (error) {
-      if (!await isLockContention(error, lockPath)) throw error
+  let recovered = false
+  const run = async () => {
+    const deadline = Date.now() + LOCK_TIMEOUT_MS
+    let delay = LOCK_RETRY_INITIAL_MS
+    for (;;) {
+      try {
+        await writeFile(lockPath, `${String(process.pid)}\n`, { mode: 0o600, flag: 'wx' })
+        break
+      } catch (error) {
+        if (!await isLockContention(error, lockPath)) throw error
+      }
+      if (Date.now() >= deadline) {
+        // A provably dead owner is removed and retried exactly once; anything
+        // less certain still fails, because a live owner must never be stolen.
+        if (!recovered && await ownerIsDead(lockPath)) {
+          recovered = true
+          await rm(lockPath, { force: true })
+          return run()
+        }
+        throw new Error(`dsh-subscriptions: timed out waiting for the writer lock at ${lockPath}`)
+      }
+      await new Promise(resolve => setTimeout(resolve, delay))
+      delay = Math.min(delay * 2, LOCK_RETRY_MAX_MS)
     }
-    if (Date.now() >= deadline) {
-      throw new Error(`dsh-subscriptions: timed out waiting for the writer lock at ${lockPath}`)
-    }
-    await new Promise(resolve => setTimeout(resolve, delay))
-    delay = Math.min(delay * 2, LOCK_RETRY_MAX_MS)
   }
+  // Only a successful acquisition owns the lock: reaching the operation
+  // through any failure path must leave another owner's file alone.
+  await run()
   try {
     return await operation()
   } finally {
@@ -105,4 +154,4 @@ async function withFileLock(filename, operation) {
   }
 }
 
-module.exports = { LOCK_TIMEOUT_MS, withFileLock, writeFileAtomic }
+module.exports = { LOCK_TIMEOUT_MS, ownerIsDead, withFileLock, writeFileAtomic }
