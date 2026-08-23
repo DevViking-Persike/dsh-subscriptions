@@ -1,0 +1,198 @@
+{
+ "texto": [
+  {
+   "type": "block-start",
+   "index": 0,
+   "blockType": "text"
+  },
+  {
+   "type": "text-delta",
+   "index": 0,
+   "text": "Oi"
+  },
+  {
+   "type": "block-end",
+   "index": 0,
+   "block": {
+    "type": "text",
+    "text": "Oi"
+   }
+  },
+  {
+   "type": "usage",
+   "usage": {
+    "inputTokens": 10,
+    "outputTokens": 5
+   }
+  },
+  {
+   "type": "finish",
+   "reason": {
+    "kind": "stop"
+   }
+  }
+ ],
+ "thinking": [
+  {
+   "type": "block-start",
+   "index": 0,
+   "blockType": "reasoning"
+  },
+  {
+   "type": "reasoning-delta",
+   "index": 0,
+   "text": "penso"
+  },
+  {
+   "type": "block-end",
+   "index": 0,
+   "block": {
+    "type": "reasoning",
+    "text": "penso"
+   }
+  },
+  {
+   "type": "usage",
+   "usage": {
+    "inputTokens": 3,
+    "outputTokens": 2
+   }
+  },
+  {
+   "type": "finish",
+   "reason": {
+    "kind": "stop"
+   }
+  }
+ ],
+ "tool_use": [
+  {
+   "type": "block-start",
+   "index": 0,
+   "blockType": "tool-call"
+  },
+  {
+   "type": "tool-call-delta",
+   "index": 0,
+   "id": "tu_1",
+   "name": "f",
+   "argumentsDelta": "{\"a\":"
+  },
+  {
+   "type": "tool-call-delta",
+   "index": 0,
+   "id": "tu_1",
+   "name": "f",
+   "argumentsDelta": "1}"
+  },
+  {
+   "type": "block-end",
+   "index": 0,
+   "block": {
+    "type": "tool-call",
+    "id": "tu_1",
+    "name": "f",
+    "arguments": "{\"a\":1}"
+   }
+  },
+  {
+   "type": "usage",
+   "usage": {
+    "inputTokens": 4,
+    "outputTokens": 7
+   }
+  },
+  {
+   "type": "finish",
+   "reason": {
+    "kind": "tool-calls"
+   }
+  }
+ ],
+ "cache read": [
+  {
+   "type": "block-start",
+   "index": 0,
+   "blockType": "text"
+  },
+  {
+   "type": "text-delta",
+   "index": 0,
+   "text": "x"
+  },
+  {
+   "type": "block-end",
+   "index": 0,
+   "block": {
+    "type": "text",
+    "text": "x"
+   }
+  },
+  {
+   "type": "usage",
+   "usage": {
+    "inputTokens": 100,
+    "outputTokens": 1,
+    "cacheReadTokens": 900
+   }
+  },
+  {
+   "type": "finish",
+   "reason": {
+    "kind": "stop"
+   }
+  }
+ ],
+ "sem conteudo": [
+  {
+   "type": "usage",
+   "usage": {
+    "inputTokens": 1,
+    "outputTokens": 0
+   }
+  },
+  {
+   "type": "finish",
+   "reason": {
+    "kind": "error",
+    "failure": {
+     "message": "model returned a completed response with no content",
+     "code": "EMPTY_RESPONSE"
+    }
+   }
+  }
+ ],
+ "max_tokens": [
+  {
+   "type": "block-start",
+   "index": 0,
+   "blockType": "text"
+  },
+  {
+   "type": "text-delta",
+   "index": 0,
+   "text": "x"
+  },
+  {
+   "type": "block-end",
+   "index": 0,
+   "block": {
+    "type": "text",
+    "text": "x"
+   }
+  },
+  {
+   "type": "usage",
+   "usage": {
+    "inputTokens": 1,
+    "outputTokens": 9
+   }
+  },
+  {
+   "type": "finish",
+   "reason": {
+    "kind": "max-tokens"
+   }
+  }
+ ]
+}

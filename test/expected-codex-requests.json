@@ -1,0 +1,107 @@
+{
+ "texto": {
+  "model": "m",
+  "input": [
+   {
+    "type": "message",
+    "role": "user",
+    "content": [
+     {
+      "type": "input_text",
+      "text": "oi"
+     }
+    ]
+   }
+  ],
+  "stream": true,
+  "store": false,
+  "include": [
+   "reasoning.encrypted_content"
+  ]
+ },
+ "com system": {
+  "model": "m",
+  "instructions": "seja breve",
+  "input": [
+   {
+    "type": "message",
+    "role": "user",
+    "content": [
+     {
+      "type": "input_text",
+      "text": "oi"
+     }
+    ]
+   }
+  ],
+  "stream": true,
+  "store": false,
+  "include": [
+   "reasoning.encrypted_content"
+  ]
+ },
+ "tool call": {
+  "model": "m",
+  "input": [
+   {
+    "type": "function_call",
+    "call_id": "c1",
+    "name": "f",
+    "arguments": "{\"a\":1}"
+   }
+  ],
+  "stream": true,
+  "store": false,
+  "include": [
+   "reasoning.encrypted_content"
+  ]
+ },
+ "tool result vazio": {
+  "model": "m",
+  "input": [
+   {
+    "type": "function_call_output",
+    "call_id": "c1",
+    "output": "(no output)"
+   }
+  ],
+  "stream": true,
+  "store": false,
+  "include": [
+   "reasoning.encrypted_content"
+  ]
+ },
+ "com ferramentas": {
+  "model": "m",
+  "input": [
+   {
+    "type": "message",
+    "role": "user",
+    "content": [
+     {
+      "type": "input_text",
+      "text": "x"
+     }
+    ]
+   }
+  ],
+  "stream": true,
+  "tools": [
+   {
+    "type": "function",
+    "name": "f",
+    "description": "d",
+    "parameters": {
+     "type": "object"
+    },
+    "strict": false
+   }
+  ],
+  "tool_choice": "auto",
+  "parallel_tool_calls": false,
+  "store": false,
+  "include": [
+   "reasoning.encrypted_content"
+  ]
+ }
+}

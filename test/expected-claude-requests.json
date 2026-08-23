@@ -1,0 +1,150 @@
+{
+ "texto": {
+  "model": "m",
+  "max_tokens": 4096,
+  "system": [
+   {
+    "type": "text",
+    "text": "You are Claude Code, Anthropic's official CLI for Claude."
+   }
+  ],
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "oi"
+     }
+    ]
+   }
+  ],
+  "stream": true
+ },
+ "com system": {
+  "model": "m",
+  "max_tokens": 4096,
+  "system": [
+   {
+    "type": "text",
+    "text": "You are Claude Code, Anthropic's official CLI for Claude."
+   },
+   {
+    "type": "text",
+    "text": "seja breve"
+   }
+  ],
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "oi"
+     }
+    ]
+   }
+  ],
+  "stream": true
+ },
+ "tool call vazio": {
+  "model": "m",
+  "max_tokens": 4096,
+  "system": [
+   {
+    "type": "text",
+    "text": "You are Claude Code, Anthropic's official CLI for Claude."
+   }
+  ],
+  "messages": [
+   {
+    "role": "assistant",
+    "content": [
+     {
+      "type": "tool_use",
+      "id": "c1",
+      "name": "f",
+      "input": {}
+     }
+    ]
+   }
+  ],
+  "stream": true
+ },
+ "tool result vazio": {
+  "model": "m",
+  "max_tokens": 4096,
+  "system": [
+   {
+    "type": "text",
+    "text": "You are Claude Code, Anthropic's official CLI for Claude."
+   }
+  ],
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "tool_result",
+      "tool_use_id": "c1",
+      "content": "(no output)"
+     }
+    ]
+   }
+  ],
+  "stream": true
+ },
+ "reasoning descartado": {
+  "model": "m",
+  "max_tokens": 4096,
+  "system": [
+   {
+    "type": "text",
+    "text": "You are Claude Code, Anthropic's official CLI for Claude."
+   }
+  ],
+  "messages": [
+   {
+    "role": "assistant",
+    "content": [
+     {
+      "type": "text",
+      "text": "resposta"
+     }
+    ]
+   }
+  ],
+  "stream": true
+ },
+ "com ferramentas": {
+  "model": "m",
+  "max_tokens": 4096,
+  "system": [
+   {
+    "type": "text",
+    "text": "You are Claude Code, Anthropic's official CLI for Claude."
+   }
+  ],
+  "messages": [
+   {
+    "role": "user",
+    "content": [
+     {
+      "type": "text",
+      "text": "x"
+     }
+    ]
+   }
+  ],
+  "stream": true,
+  "tools": [
+   {
+    "name": "f",
+    "description": "d",
+    "input_schema": {
+     "type": "object"
+    }
+   }
+  ]
+ }
+}

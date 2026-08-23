@@ -1,0 +1,8 @@
+# dsh bundle layer: mount the subscription routes.
+#
+# Mounting costs nothing until a model call selects one: credentials resolve
+# per request, so a subscription that is not connected fails that call rather
+# than blocking startup. Set `routes` to enable only one.
+- insert:
+    - id: dsh-subscriptions
+      name: 'dsh-subscriptions'

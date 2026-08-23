@@ -1,0 +1,39 @@
+{
+  "name": "dsh-subscriptions",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness plugin: use your own Claude and ChatGPT/Codex subscriptions as model providers, over each vendor OAuth flow",
+  "license": "MIT",
+  "main": "dsh/index.js",
+  "exports": {
+    ".": "./dsh/index.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dsh/**",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "NOTICE.md"
+  ],
+  "dependencies": {
+    "eventsource-parser": "^3.1.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "llm",
+    "claude",
+    "codex",
+    "oauth"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DevViking-Persike/dsh-subscriptions.git"
+  }
+}
