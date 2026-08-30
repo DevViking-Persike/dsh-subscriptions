@@ -7,7 +7,7 @@
 const { SubscriptionError, httpErrorCode, redact, retryAfterMs } = require('../errors.js')
 const { idleWatchdog } = require('../watchdog.js')
 const { parseSse } = require('./sse.js')
-const { serializeRequest } = require('./serialize.js')
+const { contentHasImage, serializeRequest, serializeRequestWithImages } = require('./serialize.js')
 const { translate } = require('./translate.js')
 
 /** The provider route this adapter serves. */
@@ -40,22 +40,27 @@ function modelInfo(provider, model) {
     id: model.id,
     name: model.name ?? model.id,
     ...model.description === undefined ? {} : { description: model.description },
-    inputModalities: ['text'],
+    // The catalog states this per model, not per route, and the composer gates
+    // attachment on exactly this field.
+    inputModalities: [...model.inputModalities ?? ['text']],
   }
 }
 
 /**
  * Build the Claude adapter.
  *
- * @param {object} deps - `config` (resolved) and `resolveAccessToken()`.
+ * @param {object} deps - `config` (resolved), `resolveAccessToken()`, and an
+ *   optional `resolveAttachments()` for image input.
  * @returns {object} the adapter the registry accepts.
  */
-function createClaudeAdapter({ config, resolveAccessToken }) {
-  async function* request(options, signal, accessToken, onActivity) {
+function createClaudeAdapter({ config, resolveAccessToken, resolveAttachments }) {
+  async function* request(options, signal, accessToken, attachments, onActivity) {
     // Serialized outside the try: refusing unsupported content is a statement
     // about the request, and the transport's catch would report it as an
     // unreachable endpoint.
-    const body = JSON.stringify(serializeRequest(options, { maxTokens: config.maxTokens }))
+    const body = JSON.stringify(attachments === undefined
+      ? serializeRequest(options, { maxTokens: config.maxTokens })
+      : await serializeRequestWithImages(options, { maxTokens: config.maxTokens }, attachments, signal))
     let response
     try {
       response = await fetch(`${config.baseURL}/v1/messages`, {
@@ -137,6 +142,29 @@ function createClaudeAdapter({ config, resolveAccessToken }) {
     },
 
     async * stream(options) {
+      // Image capability is checked before the credential, the attachment
+      // read, and the network: a model that cannot see the image must refuse
+      // it here, while the operator can still pick another model.
+      const hasImages = options.messages.some(message => contentHasImage(message.content))
+      let attachments
+      if (hasImages) {
+        const model = config.claudeModels.find(entry => entry.id === options.model)
+        if (model?.inputModalities?.includes('image') !== true) {
+          throw new SubscriptionError(
+            `Model "${options.model}" does not accept image input.`,
+            'UNSUPPORTED_CONTENT',
+          )
+        }
+        // Resolved per request, not at load: Cordis load order must not
+        // decide whether images work for the whole process.
+        attachments = resolveAttachments?.()
+        if (attachments === undefined) {
+          throw new SubscriptionError(
+            'Image input requires the durable attachment service.',
+            'UNSUPPORTED_CONTENT',
+          )
+        }
+      }
       const accessToken = await resolveAccessToken()
       if (accessToken === undefined) {
         throw new SubscriptionError(
@@ -149,7 +177,7 @@ function createClaudeAdapter({ config, resolveAccessToken }) {
         ? consumer.signal
         : AbortSignal.any([options.signal, consumer.signal])
       const watchdog = idleWatchdog(upstream, config.streamIdleTimeoutMs)
-      const iterator = request(options, watchdog.signal, accessToken, () => { watchdog.pulse() })[Symbol.asyncIterator]()
+      const iterator = request(options, watchdog.signal, accessToken, attachments, () => { watchdog.pulse() })[Symbol.asyncIterator]()
       let exhausted = false
       try {
         while (true) {

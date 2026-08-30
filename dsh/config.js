@@ -16,22 +16,36 @@ const DEFAULT_MAX_TOKENS = 32_000
 /** Node's largest usable timer delay; a longer one fires immediately. */
 const MAX_TIMER_DELAY_MS = 2_147_483_647
 
+/**
+ * Modalities a catalog entry may declare.
+ *
+ * Only image is added here: the serializers resolve image attachments into
+ * wire parts, and declaring a modality the adapter cannot send would admit
+ * input it then drops.
+ */
+const MODEL_MODALITIES = ['text', 'image']
+
+/** Text and image, for the models whose vendor documents image input. */
+const VISION = ['text', 'image']
+
 /** Claude models the subscription serves, when the operator configures none. */
 const DEFAULT_CLAUDE_MODELS = [
-  { id: 'claude-fable-5', name: 'Claude Fable 5', contextWindow: 1_000_000, maxTokens: 128_000 },
-  { id: 'claude-opus-5', name: 'Claude Opus 5', contextWindow: 1_000_000, maxTokens: 128_000 },
-  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', contextWindow: 1_000_000, maxTokens: 128_000 },
-  { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', contextWindow: 1_000_000, maxTokens: 128_000 },
-  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', contextWindow: 200_000, maxTokens: 128_000 },
-  { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', contextWindow: 200_000, maxTokens: 64_000 },
+  { id: 'claude-fable-5', name: 'Claude Fable 5', contextWindow: 1_000_000, maxTokens: 128_000, inputModalities: VISION },
+  { id: 'claude-opus-5', name: 'Claude Opus 5', contextWindow: 1_000_000, maxTokens: 128_000, inputModalities: VISION },
+  { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', contextWindow: 1_000_000, maxTokens: 128_000, inputModalities: VISION },
+  { id: 'claude-opus-4-8', name: 'Claude Opus 4.8', contextWindow: 1_000_000, maxTokens: 128_000, inputModalities: VISION },
+  { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', contextWindow: 200_000, maxTokens: 128_000, inputModalities: VISION },
+  { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5', contextWindow: 200_000, maxTokens: 64_000, inputModalities: VISION },
 ]
 
 /** Codex models the subscription serves, when the operator configures none. */
 const DEFAULT_CODEX_MODELS = [
-  { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', contextWindow: 400_000, maxTokens: 128_000 },
-  { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', contextWindow: 400_000, maxTokens: 128_000 },
-  { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', contextWindow: 400_000, maxTokens: 128_000 },
-  { id: 'gpt-5.5', name: 'GPT-5.5', contextWindow: 400_000, maxTokens: 128_000 },
+  { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', contextWindow: 400_000, maxTokens: 128_000, inputModalities: VISION },
+  { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', contextWindow: 400_000, maxTokens: 128_000, inputModalities: VISION },
+  { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', contextWindow: 400_000, maxTokens: 128_000, inputModalities: VISION },
+  { id: 'gpt-5.5', name: 'GPT-5.5', contextWindow: 400_000, maxTokens: 128_000, inputModalities: VISION },
+  // Codex Spark serves text only, so over-claiming would admit an image the
+  // endpoint refuses after the message is durable.
   { id: 'gpt-5.3-codex-spark', name: 'GPT-5.3 Codex Spark', contextWindow: 400_000, maxTokens: 128_000 },
 ]
 
@@ -64,6 +78,35 @@ function positiveInteger(value, field, fallback) {
 }
 
 /**
+ * Validate one entry's declared input modalities.
+ *
+ * The default is text alone, and that asymmetry is deliberate: under-claiming
+ * refuses an image before it is attached, which the operator sees immediately,
+ * while over-claiming admits an image the endpoint rejects after the message
+ * is durable — a request no later turn can recover.
+ *
+ * @param {unknown} value - the configured array.
+ * @param {string} field - field name, for the message.
+ * @returns {string[]} the validated modalities.
+ */
+function modalities(value, field) {
+  if (value === undefined) return ['text']
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error(`dsh-subscriptions: ${field} must be a non-empty array`)
+  }
+  const seen = new Set()
+  for (const modality of value) {
+    if (!MODEL_MODALITIES.includes(modality)) {
+      throw new Error(`dsh-subscriptions: ${field} must contain only ${MODEL_MODALITIES.join(' and ')}`)
+    }
+    if (seen.has(modality)) throw new Error(`dsh-subscriptions: ${field} must not contain duplicates`)
+    seen.add(modality)
+  }
+  if (!seen.has('text')) throw new Error(`dsh-subscriptions: ${field} must include "text"`)
+  return [...value]
+}
+
+/**
  * Validate one configured model catalog.
  * @param {unknown} value - the configured array.
  * @param {string} field - field name, for the message.
@@ -88,6 +131,7 @@ function catalog(value, field, fallback) {
       name: typeof entry.name === 'string' && entry.name.length > 0 ? entry.name : entry.id,
       contextWindow: positiveInteger(entry.contextWindow, `${where}.contextWindow`, DEFAULT_CONTEXT_WINDOW),
       maxTokens: positiveInteger(entry.maxTokens, `${where}.maxTokens`, DEFAULT_MAX_TOKENS),
+      inputModalities: Object.freeze(modalities(entry.inputModalities, `${where}.inputModalities`)),
     }
   })
 }
@@ -149,5 +193,7 @@ module.exports = {
   DEFAULT_RETRY_POLICY,
   DEFAULT_STREAM_IDLE_TIMEOUT_MS,
   MAX_TIMER_DELAY_MS,
+  MODEL_MODALITIES,
+  VISION,
   resolveConfig,
 }

@@ -59,7 +59,7 @@ What it affects is accounting, and the two routes deliberately **disagree**:
 
 Both directions are pinned by tests recorded from the harness's own implementations, because getting either backwards raises nothing — it just misreports context in every cost display.
 
-Text only on both routes. Image content is refused before a request is sent, since the serialization path would drop it and the model would answer a question it never saw.
+Text and image input on both routes. An image block is a durable attachment reference, not bytes: the adapter resolves it through the harness attachment service per request (so mounting that service later starts image input without a restart) and sends it inline — a base64 `image` source on the Anthropic route, a `data:` URL `input_image` on the Responses route. A model whose catalog entry does not declare image input is refused before serialization, since dropping the image silently would have the model answer a question it never saw. Tool-result images ride inside the `tool_result` content array on the Claude route; the Codex route's `function_call_output` takes a string only, so its images are flushed into a following user message in order.
 
 ## Safety
 
@@ -74,7 +74,7 @@ Text only on both routes. Image content is refused before a request is sent, sin
 - **Version-sensitive by construction.** This plugin lives outside the harness repository, which states it makes no compatibility promise before its first release. The chunk vocabulary is therefore verified at load, and a mismatch refuses to mount with a message naming the drifted field.
 - The sign-in callback binds `127.0.0.1`, while the vendors' registered redirect URIs say `localhost`. On a host where `localhost` resolves to `::1` first, the browser callback will not arrive. The ports are fixed by the public clients and cannot be reconfigured.
 - Model catalogs are static configuration, not discovered from the vendor. A model your subscription serves but the catalog omits still works when named explicitly, resolving with the default context window.
-- No image input, and the Codex route rejects stop sequences — the Responses API has no equivalent, and silently dropping one would let a model run past a boundary the caller relied on.
+- Image input requires the harness attachment service (`ctx.attachments`); without it, an image request is refused with `UNSUPPORTED_CONTENT` rather than dropped. The Codex route rejects stop sequences — the Responses API has no equivalent, and silently dropping one would let a model run past a boundary the caller relied on.
 - The test suite runs entirely against local `node:http` servers. It proves this plugin's behavior, not that either vendor still speaks exactly this dialect: the fixtures encode the harness's belief about the wire, recorded from its own implementations.
 
 ## Tests
@@ -83,7 +83,7 @@ Text only on both routes. Image content is refused before a request is sent, sin
 npm install && node --test test/*.test.js
 ```
 
-132 tests, no network and no credential required.
+156 tests, no network and no credential required.
 
 ## License
 

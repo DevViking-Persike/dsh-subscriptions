@@ -189,6 +189,10 @@ module.exports = {
         config,
         resolveAccess: () => session.access(),
         resolveAccessToken: async () => (await session.access())?.token,
+        // Optional and resolved per request: a deployment without the
+        // attachment service still serves every text request, and mounting
+        // that service later starts image input without a restart.
+        resolveAttachments: () => ctx.get('attachments'),
       })
       ctx.effect(() => ctx.llm.registerAdapter([CLAUDE_PROVIDER], adapter), 'dsh-subscriptions: Claude route')
       disposers.push(session.startRefreshTimer())
@@ -206,7 +210,11 @@ module.exports = {
       await session.seedFrom(config.codexImportFrom, claudeImport).catch((error) => {
         log.error?.(`dsh-subscriptions: Codex import failed: ${redact(error.message)}`)
       })
-      const adapter = createCodexAdapter({ config, resolveAccess: () => session.access() })
+      const adapter = createCodexAdapter({
+        config,
+        resolveAccess: () => session.access(),
+        resolveAttachments: () => ctx.get('attachments'),
+      })
       ctx.effect(() => ctx.llm.registerAdapter([CODEX_PROVIDER], adapter), 'dsh-subscriptions: Codex route')
       disposers.push(session.startRefreshTimer())
     }

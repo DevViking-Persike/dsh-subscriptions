@@ -7,7 +7,7 @@ const { randomUUID } = require('node:crypto')
 const { SubscriptionError, httpErrorCode, redact, retryAfterMs } = require('../errors.js')
 const { idleWatchdog } = require('../watchdog.js')
 const { parseSse } = require('./sse.js')
-const { serializeRequest } = require('./serialize.js')
+const { contentHasImage, serializeRequest, serializeRequestWithImages } = require('./serialize.js')
 const { translate } = require('./translate.js')
 
 /** The provider route this adapter serves. */
@@ -29,22 +29,27 @@ function modelInfo(provider, model) {
     id: model.id,
     name: model.name ?? model.id,
     ...model.description === undefined ? {} : { description: model.description },
-    inputModalities: ['text'],
+    // The catalog states this per model, and the composer gates attachment on
+    // exactly this field.
+    inputModalities: [...model.inputModalities ?? ['text']],
   }
 }
 
 /**
  * Build the Codex adapter.
  *
- * @param {object} deps - `config` (resolved) and `resolveAccess()` returning
- *   the access token plus the account id the backend routes on.
+ * @param {object} deps - `config` (resolved), `resolveAccess()` returning the
+ *   access token plus the account id the backend routes on, and an optional
+ *   `resolveAttachments()` for image input.
  * @returns {object} the adapter the registry accepts.
  */
-function createCodexAdapter({ config, resolveAccess }) {
-  async function* request(options, signal, access, onActivity) {
+function createCodexAdapter({ config, resolveAccess, resolveAttachments }) {
+  async function* request(options, signal, access, attachments, onActivity) {
     // Serialized outside the try so an unsupported-content refusal is never
     // reported as an unreachable endpoint.
-    const body = JSON.stringify(serializeRequest(options, {}))
+    const body = JSON.stringify(attachments === undefined
+      ? serializeRequest(options, {})
+      : await serializeRequestWithImages(options, {}, attachments, signal))
     let response
     try {
       response = await fetch(`${config.codexBaseURL}/codex/responses`, {
@@ -120,6 +125,29 @@ function createCodexAdapter({ config, resolveAccess }) {
     },
 
     async * stream(options) {
+      // Image capability is checked before the credential, the attachment
+      // read, and the network: a model that cannot see the image must refuse
+      // it here, while the operator can still pick another model.
+      const hasImages = options.messages.some(message => contentHasImage(message.content))
+      let attachments
+      if (hasImages) {
+        const model = config.codexModels.find(entry => entry.id === options.model)
+        if (model?.inputModalities?.includes('image') !== true) {
+          throw new SubscriptionError(
+            `Model "${options.model}" does not accept image input.`,
+            'UNSUPPORTED_CONTENT',
+          )
+        }
+        // Resolved per request, not at load: Cordis load order must not
+        // decide whether images work for the whole process.
+        attachments = resolveAttachments?.()
+        if (attachments === undefined) {
+          throw new SubscriptionError(
+            'Image input requires the durable attachment service.',
+            'UNSUPPORTED_CONTENT',
+          )
+        }
+      }
       const access = await resolveAccess()
       if (access === undefined) {
         throw new SubscriptionError(
@@ -132,7 +160,7 @@ function createCodexAdapter({ config, resolveAccess }) {
         ? consumer.signal
         : AbortSignal.any([options.signal, consumer.signal])
       const watchdog = idleWatchdog(upstream, config.streamIdleTimeoutMs)
-      const iterator = request(options, watchdog.signal, access, () => { watchdog.pulse() })[Symbol.asyncIterator]()
+      const iterator = request(options, watchdog.signal, access, attachments, () => { watchdog.pulse() })[Symbol.asyncIterator]()
       let exhausted = false
       try {
         while (true) {
