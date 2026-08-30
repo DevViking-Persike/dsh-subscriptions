@@ -58,6 +58,11 @@ function authorizeUrl(spec, challenge) {
  * Neither the request body nor any token text enters a thrown message; an
  * upstream error body is redacted and capped before being quoted.
  *
+ * The wire format is per provider: `spec.tokenBody` selects JSON (Anthropic,
+ * whose endpoint answers `invalid_request_error` to a form-encoded
+ * authorization-code exchange and whose official client sends JSON with the
+ * `oauth-2025-04-20` beta header) or form-urlencoded (OpenAI's auth server).
+ *
  * @param {object} spec - the provider's OAuth constants.
  * @param {URLSearchParams} body - the grant parameters.
  * @param {AbortSignal} [signal] - caller cancellation.
@@ -65,12 +70,18 @@ function authorizeUrl(spec, challenge) {
  */
 async function tokenRequest(spec, body, signal) {
   const timeout = AbortSignal.timeout(TOKEN_TIMEOUT_MS)
+  const [contentType, wire] = spec.tokenBody === 'json'
+    ? ['application/json', JSON.stringify(Object.fromEntries(body.entries()))]
+    : ['application/x-www-form-urlencoded', body]
   let response
   try {
     response = await fetch(spec.tokenUrl, {
       method: 'POST',
-      headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body,
+      headers: {
+        'content-type': contentType,
+        ...spec.tokenHeaders,
+      },
+      body: wire,
       signal: signal === undefined ? timeout : AbortSignal.any([signal, timeout]),
     })
   } catch (error) {

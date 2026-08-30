@@ -27,6 +27,11 @@ const CLAUDE_SPEC = {
   scope: 'user:profile user:inference user:sessions:claude_code',
   // Fixed by the registered public client; it cannot be reconfigured.
   redirectUri: 'http://localhost:54545/callback',
+  // The token endpoint answers `invalid_request_error` to a form-encoded
+  // authorization-code exchange; the official client sends JSON with this
+  // beta header, and so does this route.
+  tokenBody: 'json',
+  tokenHeaders: { 'anthropic-beta': 'oauth-2025-04-20' },
 }
 
 /** OpenAI's public Codex CLI client. */

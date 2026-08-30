@@ -116,3 +116,35 @@ test('expiry is computed locally, since the response carries a duration', async 
     assert.ok(result.expires <= Date.now() + 3_600_000)
   } finally { globalThis.fetch = original }
 })
+
+test('a spec with tokenBody json sends JSON with its extra headers', async () => {
+  const original = globalThis.fetch
+  let seen
+  globalThis.fetch = (url, init) => {
+    seen = { url: String(url), contentType: init.headers['content-type'], beta: init.headers['anthropic-beta'], body: init.body }
+    return Promise.resolve(Response.json({ access_token: 'a', refresh_token: 'r', expires_in: 3600 }))
+  }
+  try {
+    await tokenRequest(
+      { ...SPEC, tokenBody: 'json', tokenHeaders: { 'anthropic-beta': 'oauth-2025-04-20' } },
+      new URLSearchParams({ grant_type: 'refresh_token', refresh_token: 'x' }),
+    )
+    assert.equal(seen.contentType, 'application/json')
+    assert.equal(seen.beta, 'oauth-2025-04-20')
+    assert.deepEqual(JSON.parse(seen.body), { grant_type: 'refresh_token', refresh_token: 'x' })
+  } finally { globalThis.fetch = original }
+})
+
+test('a spec without tokenBody keeps the form-encoded wire', async () => {
+  const original = globalThis.fetch
+  let seen
+  globalThis.fetch = (_url, init) => {
+    seen = { contentType: init.headers['content-type'], body: init.body }
+    return Promise.resolve(Response.json({ access_token: 'a', refresh_token: 'r', expires_in: 3600 }))
+  }
+  try {
+    await tokenRequest(SPEC, new URLSearchParams({ grant_type: 'refresh_token' }))
+    assert.equal(seen.contentType, 'application/x-www-form-urlencoded')
+    assert.equal(String(seen.body), 'grant_type=refresh_token')
+  } finally { globalThis.fetch = original }
+})
