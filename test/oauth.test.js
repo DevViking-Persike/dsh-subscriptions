@@ -148,3 +148,12 @@ test('a spec without tokenBody keeps the form-encoded wire', async () => {
     assert.equal(String(seen.body), 'grant_type=refresh_token')
   } finally { globalThis.fetch = original }
 })
+
+test('the Claude spec mirrors the official client authorize shape', async () => {
+  const { CLAUDE_SPEC, CODEX_SPEC } = require('../dsh/index.js')
+  const url = new URL(authorizeUrl(CLAUDE_SPEC, { challenge: 'c', state: 's' }))
+  assert.equal(url.origin + url.pathname, 'https://platform.claude.com/oauth/authorize')
+  assert.equal(url.searchParams.get('code'), 'true')
+  assert.equal(CLAUDE_SPEC.tokenBody, 'json')
+  assert.equal(CODEX_SPEC.tokenBody, undefined)
+})

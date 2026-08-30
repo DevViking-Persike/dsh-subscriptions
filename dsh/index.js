@@ -22,16 +22,17 @@ const { translate: claudeTranslate } = require('./claude/translate.js')
 const CLAUDE_SPEC = {
   label: 'Claude',
   clientId: '9d1c250a-e61b-44d9-88ed-5944d1962f5e',
-  authorizeUrl: 'https://claude.ai/oauth/authorize',
+  // The console authorize endpoint the official client uses in prod; the
+  // claude.ai host serves a different flow.
+  authorizeUrl: 'https://platform.claude.com/oauth/authorize',
   tokenUrl: 'https://platform.claude.com/v1/oauth/token',
   scope: 'user:profile user:inference user:sessions:claude_code',
   // Fixed by the registered public client; it cannot be reconfigured.
   redirectUri: 'http://localhost:54545/callback',
-  // The token endpoint answers `invalid_request_error` to a form-encoded
-  // authorization-code exchange; the official client sends JSON with this
-  // beta header, and so does this route.
+  // Mirrors the official client exactly: `code=true` on the authorize URL,
+  // and a JSON token request whose body carries the flow's `state`.
+  extraAuthorizeParams: { code: 'true' },
   tokenBody: 'json',
-  tokenHeaders: { 'anthropic-beta': 'oauth-2025-04-20' },
 }
 
 /** OpenAI's public Codex CLI client. */

@@ -131,6 +131,10 @@ function createSession({ spec, filename, log, accountFrom }) {
           code,
           code_verifier: challenge.verifier,
           redirect_uri: spec.redirectUri,
+          // Anthropic's endpoint validates the flow's state in the token
+          // body; the official client sends it, and omitting it is answered
+          // as an invalid request format.
+          state: challenge.state,
         }), abort.signal)
         // A credential with no refresh token expires within the hour and has
         // no path back except a full re-login, so it is refused outright.
