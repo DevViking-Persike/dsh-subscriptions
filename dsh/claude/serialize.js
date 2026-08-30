@@ -99,6 +99,37 @@ async function imagePart(block, attachments, signal) {
   }
 }
 
+/**
+ * Present Harness tool parameters as a JSON Schema object.
+ *
+ * Most Harness tools already carry a root `type: object`, but capability-only
+ * tools may declare `{}` or use a bare property map whose `required` flag lives
+ * on each property. Anthropic requires `input_schema.type` for every tool and
+ * rejects the complete request at the first unwrapped entry.
+ *
+ * A value already carrying `type` is a real schema and passes through. A value
+ * carrying `properties` but no type receives only the required root type.
+ *
+ * @param {object|undefined} parameters - declared tool parameters.
+ * @returns {object} a JSON Schema object.
+ */
+function toJsonSchema(parameters) {
+  if (parameters === undefined || parameters === null) return { type: 'object', properties: {} }
+  if (typeof parameters !== 'object' || Array.isArray(parameters)) return { type: 'object', properties: {} }
+  if (Object.hasOwn(parameters, 'type')) return parameters
+  if (Object.hasOwn(parameters, 'properties')) return { type: 'object', ...parameters }
+
+  const properties = {}
+  const required = []
+  for (const [name, declared] of Object.entries(parameters)) {
+    if (declared === null || typeof declared !== 'object' || Array.isArray(declared)) continue
+    const { required: isRequired, ...schema } = declared
+    properties[name] = schema
+    if (isRequired === true) required.push(name)
+  }
+  return { type: 'object', properties, ...required.length === 0 ? {} : { required } }
+}
+
 /** Serialize one assistant message: text and tool calls. */
 function serializeAssistant(message) {
   const blocks = []
@@ -195,7 +226,7 @@ function assembleRequest(options, defaults, wireMessages) {
         tools: options.tools.map(tool => ({
           name: tool.name,
           description: tool.description,
-          input_schema: tool.parameters,
+          input_schema: toJsonSchema(tool.parameters),
         })),
       }
       : {},
@@ -294,4 +325,5 @@ module.exports = {
   serializeMessagesWithImages,
   serializeRequest,
   serializeRequestWithImages,
+  toJsonSchema,
 }

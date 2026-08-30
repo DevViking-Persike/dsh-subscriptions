@@ -5,7 +5,7 @@ const { test } = require('node:test')
 const assert = require('node:assert/strict')
 const { readFileSync } = require('node:fs')
 const { join } = require('node:path')
-const { CLAUDE_CODE_PREAMBLE, serializeRequest } = require('../dsh/claude/serialize.js')
+const { CLAUDE_CODE_PREAMBLE, serializeRequest, toJsonSchema } = require('../dsh/claude/serialize.js')
 
 const EXPECTED = JSON.parse(readFileSync(join(__dirname, 'expected-claude-requests.json'), 'utf8'))
 
@@ -88,6 +88,43 @@ test('an empty tool result still carries content', () => {
   const body = serializeRequest(CASES['tool result vazio'], { maxTokens: 100 })
 
   assert.equal(body.messages[0].content[0].content, '(no output)')
+})
+
+test('an empty tool schema receives the Anthropic-required object root', () => {
+  const body = serializeRequest({
+    ...CASES.texto,
+    tools: [{ name: 'docker_images', description: 'list images', parameters: {} }],
+  }, { maxTokens: 100 })
+
+  assert.deepEqual(body.tools[0].input_schema, { type: 'object', properties: {} })
+})
+
+test('a bare Harness property map becomes JSON Schema', () => {
+  assert.deepEqual(toJsonSchema({
+    container: { type: 'string', required: true, description: 'name' },
+    tail: { type: 'number', description: 'lines' },
+  }), {
+    type: 'object',
+    properties: {
+      container: { type: 'string', description: 'name' },
+      tail: { type: 'number', description: 'lines' },
+    },
+    required: ['container'],
+  })
+})
+
+test('an object schema passes through and a properties-only schema gains its type', () => {
+  const schema = { type: 'object', properties: { x: { type: 'string' } }, required: ['x'] }
+  assert.equal(toJsonSchema(schema), schema)
+  assert.deepEqual(
+    toJsonSchema({ properties: { x: { type: 'string' } } }),
+    { type: 'object', properties: { x: { type: 'string' } } },
+  )
+})
+
+test('invalid tool parameters become an empty object schema', () => {
+  assert.deepEqual(toJsonSchema(undefined), { type: 'object', properties: {} })
+  assert.deepEqual(toJsonSchema([]), { type: 'object', properties: {} })
 })
 
 test('max_tokens is required by this protocol', () => {
