@@ -113,6 +113,13 @@ function createCodexAdapter({ config, resolveAccess, resolveAttachments }) {
       return Promise.resolve(config.codexModels.map(model => modelInfo(provider, model)))
     },
 
+    // The harness's LlmAdapter base class ships prepareCall as a default, but
+    // this adapter is a plain object, so it has to supply its own. Mirrors the
+    // base implementation; dsh >= 0.1.1-rc.2 calls it on every model call.
+    async prepareCall(provider, model, signal) {
+      return { model: await this.resolveModel(provider, model, signal), stream: options => this.stream(options) }
+    },
+
     resolveModel(provider, model) {
       const configured = config.codexModels.find(entry => entry.id === model)
       return Promise.resolve({

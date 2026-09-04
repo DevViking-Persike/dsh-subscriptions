@@ -93,6 +93,21 @@ test('reasoning is omitted from a resolved model, never sent empty', async () =>
   assert.ok(resolved.context.contextWindow > 0)
 })
 
+test('prepareCall binds the resolved model to a one-shot stream', async () => {
+  // The harness calls adapter.prepareCall on every model call and reads
+  // .model and .stream from the result; a plain-object adapter has no base
+  // class to inherit it from, so the contract is pinned here.
+  const server = await endpoint(sse(TEXT_TURN))
+  try {
+    const adapter = adapterFor(server.base)
+    const call = await adapter.prepareCall(PROVIDER, 'claude-opus-5')
+
+    assert.deepEqual(call.model, await adapter.resolveModel(PROVIDER, 'claude-opus-5'))
+    const chunks = await collect({ stream: call.stream })
+    assert.equal(chunks.at(-1).type, 'finish')
+  } finally { server.close() }
+})
+
 test('a normal stream yields chunks and finishes', async () => {
   const server = await endpoint(sse(TEXT_TURN))
   try {
