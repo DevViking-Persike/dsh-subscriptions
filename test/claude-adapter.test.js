@@ -56,7 +56,8 @@ function adapterFor(base, extra = {}, token = 'test-token') {
 /** Drive one stream to completion. */
 async function collect(adapter, options = {}) {
   const chunks = []
-  for await (const chunk of adapter.stream({
+  const prepared = await adapter.prepareCall(PROVIDER, options.model ?? 'claude-opus-5')
+  for await (const chunk of prepared.stream({
     model: 'claude-opus-5', messages: [{ role: 'user', content: [{ type: 'text', text: 'oi' }] }], ...options,
   })) chunks.push(chunk)
   return chunks

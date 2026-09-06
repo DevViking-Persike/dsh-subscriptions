@@ -83,6 +83,8 @@ Text and image input on both routes. An image block is a durable attachment refe
 
 ## Tests
 
+Both adapters implement the Harness `prepareCall()` protocol: preparation binds model metadata and dispatch to the same adapter configuration without reading credentials or contacting the provider. Image request pricing is unspecified, so the Harness uses its neutral estimate. Adapter transport tests dispatch through prepared calls.
+
 ```bash
 npm install && node --test test/*.test.js
 ```

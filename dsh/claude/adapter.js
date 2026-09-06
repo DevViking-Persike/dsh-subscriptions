@@ -121,6 +121,16 @@ function createClaudeAdapter({ config, resolveAccessToken, resolveAttachments })
       return config.retryPolicy
     },
 
+    imageRequestPricing(_provider, _model) {
+      return undefined
+    },
+
+    /** Bind model metadata and dispatch to this adapter's fixed configuration. */
+    async prepareCall(provider, model, signal) {
+      const stream = this.stream.bind(this)
+      return { model: await this.resolveModel(provider, model, signal), stream }
+    },
+
     listModels(provider) {
       return Promise.resolve(config.claudeModels.map(model => modelInfo(provider, model)))
     },

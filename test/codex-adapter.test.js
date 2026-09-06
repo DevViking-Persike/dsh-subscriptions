@@ -55,7 +55,8 @@ function adapterFor(base, extra = {}, access = { token: 'tok', accountId: 'acc_1
 /** Drive one stream to completion. */
 async function collect(adapter, options = {}) {
   const chunks = []
-  for await (const chunk of adapter.stream({
+  const prepared = await adapter.prepareCall(PROVIDER, options.model ?? 'gpt-5.5')
+  for await (const chunk of prepared.stream({
     model: 'gpt-5.5', messages: [{ role: 'user', content: [{ type: 'text', text: 'oi' }] }], ...options,
   })) chunks.push(chunk)
   return chunks
