@@ -12,6 +12,7 @@ const { translate } = require('./translate.js')
 
 /** The provider route this adapter serves. */
 const PROVIDER = 'claude-code-oauth'
+const { reasoningMetadata, assertReasoningEffort } = require('../reasoning.js')
 
 /**
  * The beta features the Claude Code client identifies with, in wire order.
@@ -135,13 +136,12 @@ function createClaudeAdapter({ config, resolveAccessToken, resolveAttachments })
           : modelInfo(provider, configured),
         context: { contextWindow: configured?.contextWindow ?? config.defaultContextWindow },
         defaultMaxTokens: configured?.maxTokens ?? config.maxTokens,
-        // `reasoning` is omitted rather than sent empty: an empty efforts
-        // array is rejected outright, while omission means the model
-        // advertises no effort and an explicit request fails with a clear code.
+        ...reasoningMetadata('claude', model),
       })
     },
 
     async * stream(options) {
+      assertReasoningEffort('claude', options.model, options.reasoningEffort)
       // Image capability is checked before the credential, the attachment
       // read, and the network: a model that cannot see the image must refuse
       // it here, while the operator can still pick another model.

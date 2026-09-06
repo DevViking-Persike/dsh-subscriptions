@@ -30,6 +30,7 @@ const VISION = ['text', 'image']
 
 /** Claude models the subscription serves, when the operator configures none. */
 const DEFAULT_CLAUDE_MODELS = [
+  { id: 'claude-fable-5-1', name: 'Claude Fable 5.1', contextWindow: 1_000_000, maxTokens: 128_000, inputModalities: VISION },
   { id: 'claude-fable-5', name: 'Claude Fable 5', contextWindow: 1_000_000, maxTokens: 128_000, inputModalities: VISION },
   { id: 'claude-opus-5', name: 'Claude Opus 5', contextWindow: 1_000_000, maxTokens: 128_000, inputModalities: VISION },
   { id: 'claude-sonnet-5', name: 'Claude Sonnet 5', contextWindow: 1_000_000, maxTokens: 128_000, inputModalities: VISION },
@@ -40,6 +41,7 @@ const DEFAULT_CLAUDE_MODELS = [
 
 /** Codex models the subscription serves, when the operator configures none. */
 const DEFAULT_CODEX_MODELS = [
+  { id: 'gpt-6-astra', name: 'GPT-6 Astra', contextWindow: 1_050_000, maxTokens: 128_000, inputModalities: VISION },
   { id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol', contextWindow: 400_000, maxTokens: 128_000, inputModalities: VISION },
   { id: 'gpt-5.6-luna', name: 'GPT-5.6 Luna', contextWindow: 400_000, maxTokens: 128_000, inputModalities: VISION },
   { id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra', contextWindow: 400_000, maxTokens: 128_000, inputModalities: VISION },

@@ -13,6 +13,7 @@
 //     only its own signed thinking blocks; an unsigned substitute is rejected.
 
 const { SubscriptionError } = require('../errors.js')
+const { assertReasoningEffort } = require('../reasoning.js')
 
 /** The identity the subscription endpoint gates on. */
 const CLAUDE_CODE_PREAMBLE = "You are Claude Code, Anthropic's official CLI for Claude."
@@ -203,6 +204,7 @@ function serializeMessages(messages) {
  * @returns {object} the request body.
  */
 function assembleRequest(options, defaults, wireMessages) {
+  assertReasoningEffort('claude', options.model, options.reasoningEffort)
   const caller = [
     ...options.messages.filter(message => message.role === 'system').map(message => flattenText(message.content)),
     ...options.system === undefined ? [] : [options.system],
@@ -221,6 +223,7 @@ function assembleRequest(options, defaults, wireMessages) {
     system,
     messages: wireMessages,
     stream: true,
+    ...options.reasoningEffort === undefined ? {} : { output_config: { effort: options.reasoningEffort } },
     ...options.tools !== undefined && options.tools.length > 0
       ? {
         tools: options.tools.map(tool => ({

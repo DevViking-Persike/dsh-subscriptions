@@ -85,11 +85,11 @@ test('model entries satisfy the catalog gate', async () => {
   }
 })
 
-test('reasoning is omitted from a resolved model, never sent empty', async () => {
-  const resolved = await adapterFor('http://x').resolveModel(PROVIDER, 'claude-opus-5')
+test('reasoning is omitted for a model without effort support, never sent empty', async () => {
+  const resolved = await adapterFor('http://x').resolveModel(PROVIDER, 'claude-haiku-4-5-20251001')
 
   assert.equal(Object.hasOwn(resolved, 'reasoning'), false)
-  assert.equal(resolved.id, 'claude-opus-5')
+  assert.equal(resolved.id, 'claude-haiku-4-5-20251001')
   assert.ok(resolved.context.contextWindow > 0)
 })
 

@@ -239,6 +239,7 @@ async function serializeConversationWithImages(messages, system, attachments, si
  * @returns {object} the request body.
  */
 function assembleRequest(options, defaults, { instructions, input }) {
+  require('../reasoning.js').assertReasoningEffort('codex', options.model, options.reasoningEffort)
   return {
     model: options.model,
     ...instructions === undefined ? {} : { instructions },

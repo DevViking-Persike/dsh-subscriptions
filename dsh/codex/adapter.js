@@ -12,6 +12,7 @@ const { translate } = require('./translate.js')
 
 /** The provider route this adapter serves. */
 const PROVIDER = 'codex-oauth'
+const { reasoningMetadata, assertReasoningEffort } = require('../reasoning.js')
 
 /**
  * The Codex CLI identity the backend gates on.
@@ -121,10 +122,12 @@ function createCodexAdapter({ config, resolveAccess, resolveAttachments }) {
           : modelInfo(provider, configured),
         context: { contextWindow: configured?.contextWindow ?? config.defaultContextWindow },
         defaultMaxTokens: configured?.maxTokens ?? config.maxTokens,
+        ...reasoningMetadata('codex', model),
       })
     },
 
     async * stream(options) {
+      assertReasoningEffort('codex', options.model, options.reasoningEffort)
       // Image capability is checked before the credential, the attachment
       // read, and the network: a model that cannot see the image must refuse
       // it here, while the operator can still pick another model.
