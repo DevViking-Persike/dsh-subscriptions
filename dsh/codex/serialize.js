@@ -30,6 +30,11 @@ function flattenText(blocks) {
   return blocks.filter(block => block.type === 'text').map(block => block.text).join('')
 }
 
+/** Preserve a received tool-call block as quoted context, not an assistant action. */
+function quotedToolCall(block) {
+  return { type: 'input_text', text: `Quoted tool call (not a call by this assistant):\n${JSON.stringify(block)}` }
+}
+
 /** Refuse image content before a text-only path can erase it. */
 function assertTextOnly(blocks) {
   if (contentHasImage(blocks)) {
@@ -113,6 +118,10 @@ function serializeConversation(messages, system) {
     if (message.role === 'system') continue
     for (const block of message.content) {
       assertTextOnly([block])
+      if (block.type === 'tool-call' && message.role !== 'assistant') {
+        input.push({ type: 'message', role: 'user', content: [quotedToolCall(block)] })
+        continue
+      }
       if (block.type === 'text') {
         input.push({
           type: 'message',
@@ -202,6 +211,7 @@ async function serializeConversationWithImages(messages, system, attachments, si
     const ownBlocks = message.content.filter(block => block.type !== 'tool-result')
     for (const block of ownBlocks) {
       if (block.type === 'text' && block.text.length > 0) parts.push({ type: 'input_text', text: block.text })
+      else if (block.type === 'tool-call') parts.push(quotedToolCall(block))
       else if (block.type === 'image') parts.push(await imagePart(block, attachments, signal))
     }
     if (parts.length > 0 || toolResults.length === 0) {

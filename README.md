@@ -83,6 +83,8 @@ Text and image input on both routes. An image block is a durable attachment refe
 
 ## Tests
 
+Codex sends tool-call blocks received in user messages, including background-subagent notices, as quoted text with their original fields. Only assistant messages create Responses function calls. This applies when serializing existing history as well as new messages; stored Session events remain unchanged. Both text and image requests preserve the quoted information and genuine assistant call/result pairs.
+
 Both adapters implement the Harness `prepareCall()` protocol: preparation binds model metadata and dispatch to the same adapter configuration without reading credentials or contacting the provider. Image request pricing is unspecified, so the Harness uses its neutral estimate. Adapter transport tests dispatch through prepared calls.
 
 ```bash
