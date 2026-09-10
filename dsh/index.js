@@ -14,6 +14,7 @@ const { createServer } = require('node:http')
 const { createClaudeAdapter, PROVIDER: CLAUDE_PROVIDER } = require('./claude/adapter.js')
 const { createCodexAdapter, PROVIDER: CODEX_PROVIDER } = require('./codex/adapter.js')
 const { resolveConfig } = require('./config.js')
+const { claudeCodeUserAgent, claudeCodeVersionResolver, codexUserAgent, codexVersionResolver } = require('./client-version.js')
 const { redact } = require('./errors.js')
 const { createSession } = require('./session.js')
 const { translate: claudeTranslate } = require('./claude/translate.js')
@@ -203,6 +204,8 @@ module.exports = {
         resolveAttachments: () => ctx.get('attachments'),
       })
       ctx.effect(() => ctx.llm.registerAdapter([CLAUDE_PROVIDER], adapter), 'dsh-subscriptions: Claude route')
+      const identity = claudeCodeVersionResolver(config)()
+      log.info?.(`dsh-subscriptions: Claude route identifies as ${claudeCodeUserAgent(identity.version)} (${identity.source})`)
       disposers.push(session.startRefreshTimer())
     }
 
@@ -224,6 +227,8 @@ module.exports = {
         resolveAttachments: () => ctx.get('attachments'),
       })
       ctx.effect(() => ctx.llm.registerAdapter([CODEX_PROVIDER], adapter), 'dsh-subscriptions: Codex route')
+      const identity = codexVersionResolver(config)()
+      log.info?.(`dsh-subscriptions: Codex route identifies as ${codexUserAgent(identity.version)} (${identity.source})`)
       disposers.push(session.startRefreshTimer())
     }
 

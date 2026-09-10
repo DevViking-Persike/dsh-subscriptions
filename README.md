@@ -39,6 +39,7 @@ Every field is optional.
 | `defaultContextWindow` | `200000` | Context assumed for a model absent from the catalog. |
 | `maxTokens` | `32000` | Output cap when neither request nor catalog states one. |
 | `retryPolicy` | normal, 3 retries | Merged over the default. |
+| `claudeCodeVersion` / `codexVersion` | installed CLI | Client version sent in the user agent. Unset, the plugin reads it from the `claude` / `codex` executable on PATH (or `~/.local/bin`), re-checked every minute, so updating the CLI is the whole upgrade. Set to pin one. |
 
 ```yaml
 - id: dsh-subscriptions
@@ -47,6 +48,10 @@ Every field is optional.
     routes: ['claude']
     controlPort: 1458
 ```
+
+## Client identity
+
+Each backend accepts only the models its own CLI version knows: a request that identifies as an older Claude Code fails with `does not support this model; version X or newer is required`. The plugin therefore never hard-codes the version. It resolves it per request from the installed CLI (install path first, then `--version`), falls back to the last verified version only when no CLI is found, and logs the identity each route mounts with. Pin `claudeCodeVersion` / `codexVersion` only when the Host must impersonate a version other than the one installed.
 
 ## Model Experience
 

@@ -6,6 +6,7 @@
 
 const { join } = require('node:path')
 const { resolveDshHome } = require('./paths.js')
+const { versionOverride } = require('./client-version.js')
 
 /** Idle budget between stream reads before the transport gives up. */
 const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000
@@ -182,6 +183,9 @@ function resolveConfig(raw = {}) {
     retryPolicy: Object.freeze(raw.retryPolicy === undefined
       ? DEFAULT_RETRY_POLICY
       : { ...DEFAULT_RETRY_POLICY, ...raw.retryPolicy }),
+    // Undefined means "read the installed CLI"; see client-version.js.
+    claudeCodeVersion: versionOverride(raw.claudeCodeVersion, 'claudeCodeVersion'),
+    codexVersion: versionOverride(raw.codexVersion, 'codexVersion'),
     claudeModels: Object.freeze(catalog(raw.claudeModels, 'claudeModels', DEFAULT_CLAUDE_MODELS)),
     codexModels: Object.freeze(catalog(raw.codexModels, 'codexModels', DEFAULT_CODEX_MODELS)),
   })

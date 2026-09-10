@@ -9,6 +9,7 @@ const { idleWatchdog } = require('../watchdog.js')
 const { parseSse } = require('./sse.js')
 const { contentHasImage, serializeRequest, serializeRequestWithImages } = require('./serialize.js')
 const { translate } = require('./translate.js')
+const { codexUserAgent, codexVersionResolver } = require('../client-version.js')
 
 /** The provider route this adapter serves. */
 const PROVIDER = 'codex-oauth'
@@ -18,10 +19,10 @@ const { reasoningMetadata, assertReasoningEffort } = require('../reasoning.js')
  * The Codex CLI identity the backend gates on.
  *
  * The subscription endpoint classifies traffic by these, the same way the
- * Anthropic route depends on its system preamble.
+ * Anthropic route depends on its system preamble. The version comes from the
+ * installed Codex CLI (see client-version.js), never from a constant.
  */
 const ORIGINATOR = 'codex-tui'
-const USER_AGENT = 'codex-tui/0.146.0 (Mac OS 26.5.0; arm64) iTerm.app/3.6.10 (codex-tui; 0.146.0)'
 
 /** Project one catalog entry onto the harness model-info entry. */
 function modelInfo(provider, model) {
@@ -45,6 +46,7 @@ function modelInfo(provider, model) {
  * @returns {object} the adapter the registry accepts.
  */
 function createCodexAdapter({ config, resolveAccess, resolveAttachments }) {
+  const clientVersion = codexVersionResolver(config)
   async function* request(options, signal, access, attachments, onActivity) {
     // Serialized outside the try so an unsupported-content refusal is never
     // reported as an unreachable endpoint.
@@ -61,7 +63,7 @@ function createCodexAdapter({ config, resolveAccess, resolveAttachments }) {
           accept: 'text/event-stream',
           'openai-beta': 'responses=experimental',
           originator: ORIGINATOR,
-          'user-agent': USER_AGENT,
+          'user-agent': codexUserAgent(clientVersion().version),
           session_id: randomUUID(),
           // Absent when the credential carries no account: sending an empty
           // header routes the request to the wrong workspace.
@@ -213,4 +215,4 @@ function createCodexAdapter({ config, resolveAccess, resolveAttachments }) {
   }
 }
 
-module.exports = { ORIGINATOR, PROVIDER, USER_AGENT, createCodexAdapter }
+module.exports = { ORIGINATOR, PROVIDER, codexUserAgent, createCodexAdapter }

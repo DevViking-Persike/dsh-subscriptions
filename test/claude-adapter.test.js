@@ -119,6 +119,19 @@ test('the request carries the Claude Code identity the backend gates on', async 
   } finally { server.close() }
 })
 
+test('the user agent carries the configured Claude Code version, so a pin is honoured', async () => {
+  const server = await endpoint(sse(TEXT_TURN))
+  try {
+    const adapter = createClaudeAdapter({
+      config: resolveConfig({ baseURL: server.base, claudeCodeVersion: '9.9.9' }),
+      resolveAccessToken: () => Promise.resolve('test-token'),
+    })
+    await collect(adapter)
+
+    assert.equal(server.requests[0].headers['user-agent'], 'claude-cli/9.9.9 (external, sdk-cli)')
+  } finally { server.close() }
+})
+
 test('a missing credential names the sign-in route rather than failing opaquely', async () => {
   const adapter = createClaudeAdapter({
     config: resolveConfig({}),

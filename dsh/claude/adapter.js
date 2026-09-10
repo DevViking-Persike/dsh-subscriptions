@@ -9,6 +9,7 @@ const { idleWatchdog } = require('../watchdog.js')
 const { parseSse } = require('./sse.js')
 const { contentHasImage, serializeRequest, serializeRequestWithImages } = require('./serialize.js')
 const { translate } = require('./translate.js')
+const { claudeCodeUserAgent, claudeCodeVersionResolver } = require('../client-version.js')
 
 /** The provider route this adapter serves. */
 const PROVIDER = 'claude-code-oauth'
@@ -55,6 +56,9 @@ function modelInfo(provider, model) {
  * @returns {object} the adapter the registry accepts.
  */
 function createClaudeAdapter({ config, resolveAccessToken, resolveAttachments }) {
+  // Resolved per request, not at build: the installed CLI may auto-update while
+  // the Host runs, and the backend rejects models newer than the version sent.
+  const clientVersion = claudeCodeVersionResolver(config)
   async function* request(options, signal, accessToken, attachments, onActivity) {
     // Serialized outside the try: refusing unsupported content is a statement
     // about the request, and the transport's catch would report it as an
@@ -74,7 +78,7 @@ function createClaudeAdapter({ config, resolveAccessToken, resolveAttachments })
           'anthropic-version': '2023-06-01',
           'anthropic-beta': OAUTH_BETAS,
           'x-app': 'cli',
-          'user-agent': 'claude-cli/2.1.220 (external, sdk-cli)',
+          'user-agent': claudeCodeUserAgent(clientVersion().version),
         },
         body,
         signal,
