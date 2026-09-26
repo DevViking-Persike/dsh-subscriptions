@@ -22,7 +22,11 @@ Each opens the vendor's own sign-in page and stores the resulting OAuth credenti
 | `claude` | `claude-code-oauth` | `~/.dsh/claude-code-oauth.json` |
 | `codex` | `codex-oauth` | `~/.dsh/codex-oauth.json` |
 
-Other endpoints: `GET /<route>/status` reports whether a subscription is connected and when its token expires; `POST /<route>/logout` removes the credential. The server binds to loopback only.
+Other endpoints: `GET /<route>/status` reports whether a subscription is connected and when its token expires; `POST /<route>/logout` removes the credential; `GET /<route>/models` reports the current model list and when it was last refreshed; `POST /<route>/refresh-models` re-queries the vendor's model-list endpoint now. The server binds to loopback only.
+
+## Model discovery
+
+Catalogs are curated snapshots, and vendors add models between plugin releases. With `discoverModels` (default), each route also asks the vendor's own model-list endpoint — Anthropic's `/v1/models` under the Claude Code identity, the Codex backend's `/codex/models` under the CLI identity — at mount, every `modelRefreshMs`, and through `POST /<route>/refresh-models`. Curated entries keep their hand-verified metadata; vendor-reported models append with the endpoint's context window, input modalities, and reasoning-effort levels (Codex models the installed CLI is too old for are skipped, matching the backend's own refusal). A failed refresh leaves the previous list standing.
 
 ## Configuration
 
@@ -31,6 +35,8 @@ Every field is optional.
 | Field | Default | Meaning |
 |---|---|---|
 | `routes` | `['claude', 'codex']` | Which subscriptions to mount. |
+| `discoverModels` | `true` | Merge the vendor's live model list into each catalog (see Model discovery). |
+| `modelRefreshMs` | `21600000` | Period between live model-list refreshes. |
 | `controlPort` | `1458` | Loopback port for the sign-in endpoints. |
 | `claudeModels` / `codexModels` | shipped catalogs | A supplied array **replaces** the default. |
 | `claudeCredentialPath` / `codexCredentialPath` | under `~/.dsh` | Where each credential is stored. |

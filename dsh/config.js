@@ -16,6 +16,8 @@ const DEFAULT_CONTEXT_WINDOW = 200_000
 const DEFAULT_MAX_TOKENS = 32_000
 /** Node's largest usable timer delay; a longer one fires immediately. */
 const MAX_TIMER_DELAY_MS = 2_147_483_647
+/** Default period between live model-list refreshes: six hours. */
+const DEFAULT_MODEL_REFRESH_MS = 21_600_000
 
 /**
  * Modalities a catalog entry may declare.
@@ -117,7 +119,9 @@ function modalities(value, field) {
  * @returns {object[]}
  */
 function catalog(value, field, fallback) {
-  if (value === undefined) return fallback
+  if (value === undefined) {
+    return fallback.map(entry => ({ ...entry, inputModalities: [...(entry.inputModalities ?? ['text'])] }))
+  }
   if (!Array.isArray(value) || value.length === 0) {
     throw new Error(`dsh-subscriptions: ${field} must be a non-empty array`)
   }
@@ -134,7 +138,7 @@ function catalog(value, field, fallback) {
       name: typeof entry.name === 'string' && entry.name.length > 0 ? entry.name : entry.id,
       contextWindow: positiveInteger(entry.contextWindow, `${where}.contextWindow`, DEFAULT_CONTEXT_WINDOW),
       maxTokens: positiveInteger(entry.maxTokens, `${where}.maxTokens`, DEFAULT_MAX_TOKENS),
-      inputModalities: Object.freeze(modalities(entry.inputModalities, `${where}.inputModalities`)),
+      inputModalities: modalities(entry.inputModalities, `${where}.inputModalities`),
     }
   })
 }
@@ -186,8 +190,14 @@ function resolveConfig(raw = {}) {
     // Undefined means "read the installed CLI"; see client-version.js.
     claudeCodeVersion: versionOverride(raw.claudeCodeVersion, 'claudeCodeVersion'),
     codexVersion: versionOverride(raw.codexVersion, 'codexVersion'),
-    claudeModels: Object.freeze(catalog(raw.claudeModels, 'claudeModels', DEFAULT_CLAUDE_MODELS)),
-    codexModels: Object.freeze(catalog(raw.codexModels, 'codexModels', DEFAULT_CODEX_MODELS)),
+    // Live discovery appends vendor-reported models to each catalog on a
+    // timer and through the control port; a curated catalog stays the base.
+    discoverModels: raw.discoverModels === undefined ? true : Boolean(raw.discoverModels),
+    modelRefreshMs: positiveInteger(raw.modelRefreshMs, 'modelRefreshMs', DEFAULT_MODEL_REFRESH_MS),
+    // Mutable on purpose: a live refresh replaces the contents in place,
+    // which is how the adapters' per-request reads observe a new list.
+    claudeModels: catalog(raw.claudeModels, 'claudeModels', DEFAULT_CLAUDE_MODELS),
+    codexModels: catalog(raw.codexModels, 'codexModels', DEFAULT_CODEX_MODELS),
   })
 }
 
@@ -196,6 +206,7 @@ module.exports = {
   DEFAULT_CODEX_MODELS,
   DEFAULT_CONTEXT_WINDOW,
   DEFAULT_MAX_TOKENS,
+  DEFAULT_MODEL_REFRESH_MS,
   DEFAULT_RETRY_POLICY,
   DEFAULT_STREAM_IDLE_TIMEOUT_MS,
   MAX_TIMER_DELAY_MS,

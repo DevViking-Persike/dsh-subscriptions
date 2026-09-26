@@ -15,6 +15,7 @@ const { createClaudeAdapter, PROVIDER: CLAUDE_PROVIDER } = require('./claude/ada
 const { createCodexAdapter, PROVIDER: CODEX_PROVIDER } = require('./codex/adapter.js')
 const { resolveConfig } = require('./config.js')
 const { claudeCodeUserAgent, claudeCodeVersionResolver, codexUserAgent, codexVersionResolver } = require('./client-version.js')
+const { createModelRefresher, fetchClaudeModels, fetchCodexModels } = require('./discover.js')
 const { redact } = require('./errors.js')
 const { createSession } = require('./session.js')
 const { translate: claudeTranslate } = require('./claude/translate.js')
@@ -127,9 +128,11 @@ function claudeImport(source) {
  * @param {object} sessions - the enabled sessions by route name.
  * @param {number} port - the loopback port.
  * @param {object} log - where to report.
+ * @param {object} refreshers - live model refreshers by route name, when
+ *   discovery is enabled.
  * @returns {Promise<() => void>} the disposer.
  */
-async function startControlServer(sessions, port, log) {
+async function startControlServer(sessions, port, log, refreshers = {}) {
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://127.0.0.1:${String(port)}`)
     const [, route, action] = url.pathname.split('/')
@@ -161,7 +164,18 @@ async function startControlServer(sessions, port, log) {
       void session.logout().then(() => { reply(200, { connected: false }) })
       return
     }
-    reply(404, { error: 'expected /<route>/start, /<route>/status, or POST /<route>/logout' })
+    const refresher = refreshers[route]
+    if (action === 'models' && req.method === 'GET' && refresher !== undefined) {
+      reply(200, refresher.list())
+      return
+    }
+    if (action === 'refresh-models' && req.method === 'POST' && refresher !== undefined) {
+      void refresher.refresh()
+        .then(() => { reply(200, refresher.list()) })
+        .catch(error => { reply(503, { error: redact(error.message) }) })
+      return
+    }
+    reply(404, { error: 'expected /<route>/start, /<route>/status, POST /<route>/logout, GET /<route>/models, or POST /<route>/refresh-models' })
   })
 
   await new Promise((resolve) => {
@@ -187,6 +201,7 @@ module.exports = {
 
     const sessions = {}
     const disposers = []
+    const refreshers = {}
 
     if (config.routes.includes('claude')) {
       const session = createSession({ spec: CLAUDE_SPEC, filename: config.claudeCredentialPath, log })
@@ -207,6 +222,28 @@ module.exports = {
       const identity = claudeCodeVersionResolver(config)()
       log.info?.(`dsh-subscriptions: Claude route identifies as ${claudeCodeUserAgent(identity.version)} (${identity.source})`)
       disposers.push(session.startRefreshTimer())
+      if (config.discoverModels) {
+        refreshers.claude = createModelRefresher({
+          route: 'claude',
+          label: 'Claude',
+          target: config.claudeModels,
+          configured: config.claudeModels.map(entry => ({ ...entry, inputModalities: [...entry.inputModalities] })),
+          defaults: { contextWindow: config.defaultContextWindow, maxTokens: config.maxTokens },
+          fetchLive: async (signal) => {
+            const access = await session.access(signal)
+            return fetchClaudeModels({
+              baseURL: config.baseURL,
+              accessToken: access.token,
+              clientVersion: { userAgent: claudeCodeUserAgent(claudeCodeVersionResolver(config)().version) },
+              signal,
+            })
+          },
+          refreshMs: config.modelRefreshMs,
+          log,
+        })
+        refreshers.claude.start()
+        disposers.push(() => { refreshers.claude.stop() })
+      }
     }
 
     if (config.routes.includes('codex')) {
@@ -230,9 +267,32 @@ module.exports = {
       const identity = codexVersionResolver(config)()
       log.info?.(`dsh-subscriptions: Codex route identifies as ${codexUserAgent(identity.version)} (${identity.source})`)
       disposers.push(session.startRefreshTimer())
+      if (config.discoverModels) {
+        refreshers.codex = createModelRefresher({
+          route: 'codex',
+          label: 'Codex',
+          target: config.codexModels,
+          configured: config.codexModels.map(entry => ({ ...entry, inputModalities: [...entry.inputModalities] })),
+          defaults: { contextWindow: config.defaultContextWindow, maxTokens: config.maxTokens },
+          fetchLive: async (signal) => {
+            const access = await session.access(signal)
+            return fetchCodexModels({
+              codexBaseURL: config.codexBaseURL,
+              accessToken: access.token,
+              accountId: access.accountId,
+              clientVersion: codexVersionResolver(config)().version,
+              signal,
+            })
+          },
+          refreshMs: config.modelRefreshMs,
+          log,
+        })
+        refreshers.codex.start()
+        disposers.push(() => { refreshers.codex.stop() })
+      }
     }
 
-    const closeControl = await startControlServer(sessions, config.controlPort, log)
+    const closeControl = await startControlServer(sessions, config.controlPort, log, refreshers)
     disposers.push(closeControl)
 
     for (const [route, session] of Object.entries(sessions)) {

@@ -3,10 +3,36 @@ const { SubscriptionError } = require('./errors.js')
 
 const CLAUDE_FIVE = new Set(['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-sonnet-5'])
 const CODEX_FOUR = new Set(['gpt-5.6-sol', 'gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.5'])
-const LABELS = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Xhigh', max: 'Ultra Code (max)' }
+const LABELS = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Xhigh', max: 'Ultra Code (max)', ultra: 'Ultra' }
+
+/** Effort ids the live model list reported, keyed by `${route}:${model}`. */
+const LIVE_EFFORTS = new Map()
+
+/**
+ * Record one model's vendor-reported effort ids, overriding the static set.
+ * @param {string} route - 'claude' or 'codex'.
+ * @param {string} model - the model id.
+ * @param {string[]} ids - vendor-reported effort ids, in vendor order.
+ */
+function setLiveEfforts(route, model, ids) {
+  LIVE_EFFORTS.set(`${route}:${model}`, [...ids])
+}
+
+/**
+ * Drop every live effort record one route reported, before a refresh re-adds
+ * the models that still stand.
+ * @param {string} route - 'claude' or 'codex'.
+ */
+function resetLiveEfforts(route) {
+  for (const key of LIVE_EFFORTS.keys()) {
+    if (key.startsWith(`${route}:`)) LIVE_EFFORTS.delete(key)
+  }
+}
 
 /** Return fresh capability metadata; omission preserves the provider default. */
 function reasoningMetadata(route, model) {
+  const live = LIVE_EFFORTS.get(`${route}:${model}`)
+  if (live !== undefined) return { reasoning: { efforts: live.map(id => ({ id, name: LABELS[id] ?? id })) } }
   let ids
   if ((route === 'claude' && CLAUDE_FIVE.has(model)) || (route === 'codex' && model === 'gpt-6-astra')) {
     ids = ['low', 'medium', 'high', 'xhigh', 'max']
@@ -30,4 +56,4 @@ function assertReasoningEffort(route, model, effort) {
   }
 }
 
-module.exports = { reasoningMetadata, assertReasoningEffort }
+module.exports = { assertReasoningEffort, reasoningMetadata, resetLiveEfforts, setLiveEfforts }
