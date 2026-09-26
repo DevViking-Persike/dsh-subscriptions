@@ -50,3 +50,13 @@ test('capabilities remain model-specific and custom catalogs replace defaults', 
   assert.deepEqual(reasoningMetadata('codex', 'gpt-5.6-sol').reasoning.efforts.map(entry => entry.id), ['low', 'medium', 'high', 'xhigh'])
   assert.deepEqual(resolveConfig({ claudeModels: [{ id: 'custom' }] }).claudeModels.map(entry => entry.id), ['custom'])
 })
+
+test('discovered Claude 5-family models inherit the five effort levels', () => {
+  const { reasoningMetadata } = require('../dsh/reasoning.js')
+  for (const model of ['claude-opus-5-5', 'claude-fable-5-2', 'claude-sonnet-5-1']) {
+    assert.deepEqual(reasoningMetadata('claude', model).reasoning.efforts.map(e => e.id), ['low', 'medium', 'high', 'xhigh', 'max'])
+  }
+  // Off-family models keep the conservative default: no advertised selector.
+  assert.equal(reasoningMetadata('claude', 'claude-opus-4-7').reasoning, undefined)
+  assert.equal(reasoningMetadata('claude', 'claude-haiku-4-5-20251001').reasoning, undefined)
+})
