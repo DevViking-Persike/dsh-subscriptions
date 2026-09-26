@@ -44,19 +44,19 @@ for (const [route, model, create, serializer] of [
 }
 
 test('capabilities remain model-specific and custom catalogs replace defaults', () => {
-  assert.deepEqual(reasoningMetadata('claude', 'claude-haiku-4-5-20251001'), {})
-  assert.deepEqual(reasoningMetadata('codex', 'custom-model'), {})
+  // The selector never disappears: an unknown model still advertises the
+  // route's standard levels.
+  assert.deepEqual(reasoningMetadata('claude', 'claude-haiku-4-5-20251001').reasoning.efforts.map(e => e.id), ['low', 'medium', 'high', 'xhigh', 'max'])
+  assert.deepEqual(reasoningMetadata('codex', 'custom-model').reasoning.efforts.map(e => e.id), ['off', 'low', 'medium', 'high', 'xhigh', 'max'])
   assert.deepEqual(reasoningMetadata('claude', 'claude-sonnet-4-6').reasoning.efforts.map(entry => entry.id), ['low', 'medium', 'high', 'max'])
   assert.deepEqual(reasoningMetadata('codex', 'gpt-5.6-sol').reasoning.efforts.map(entry => entry.id), ['low', 'medium', 'high', 'xhigh'])
   assert.deepEqual(resolveConfig({ claudeModels: [{ id: 'custom' }] }).claudeModels.map(entry => entry.id), ['custom'])
 })
 
-test('discovered Claude 5-family models inherit the five effort levels', () => {
+test('every model keeps an effort selector, discovered or not', () => {
   const { reasoningMetadata } = require('../dsh/reasoning.js')
   for (const model of ['claude-opus-5-5', 'claude-fable-5-2', 'claude-sonnet-5-1']) {
     assert.deepEqual(reasoningMetadata('claude', model).reasoning.efforts.map(e => e.id), ['low', 'medium', 'high', 'xhigh', 'max'])
   }
-  // Off-family models keep the conservative default: no advertised selector.
-  assert.equal(reasoningMetadata('claude', 'claude-opus-4-7').reasoning, undefined)
-  assert.equal(reasoningMetadata('claude', 'claude-haiku-4-5-20251001').reasoning, undefined)
+  assert.deepEqual(reasoningMetadata('claude', 'claude-opus-4-7').reasoning.efforts.map(e => e.id), ['low', 'medium', 'high', 'xhigh', 'max'])
 })

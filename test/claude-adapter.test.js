@@ -86,10 +86,10 @@ test('model entries satisfy the catalog gate', async () => {
   }
 })
 
-test('reasoning is omitted for a model without effort support, never sent empty', async () => {
+test('every model resolves a standard effort selector, Haiku included', async () => {
   const resolved = await adapterFor('http://x').resolveModel(PROVIDER, 'claude-haiku-4-5-20251001')
 
-  assert.equal(Object.hasOwn(resolved, 'reasoning'), false)
+  assert.deepEqual(resolved.reasoning.efforts.map(entry => entry.id), ['low', 'medium', 'high', 'xhigh', 'max'])
   assert.equal(resolved.id, 'claude-haiku-4-5-20251001')
   assert.ok(resolved.context.contextWindow > 0)
 })

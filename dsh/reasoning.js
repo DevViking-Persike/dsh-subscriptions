@@ -1,12 +1,8 @@
 // Exact model capabilities shared by discovery and request validation.
 const { SubscriptionError } = require('./errors.js')
 
-const CLAUDE_FIVE = new Set(['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-sonnet-5'])
-// The Anthropic model list reports no effort levels, so a discovered model
-// inherits its family's: every 5-generation flagship exposes the same five.
-const CLAUDE_FIVE_FAMILY = /^claude-(?:fable|opus|sonnet)-5(?:[-.]|$)/
 const CODEX_FOUR = new Set(['gpt-5.6-sol', 'gpt-5.6-luna', 'gpt-5.6-terra', 'gpt-5.5'])
-const LABELS = { low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Xhigh', max: 'Ultra Code (max)', ultra: 'Ultra' }
+const LABELS = { off: 'Off', low: 'Low', medium: 'Medium', high: 'High', xhigh: 'Xhigh', max: 'Ultra Code (max)', ultra: 'Ultra' }
 
 /** Effort ids the live model list reported, keyed by `${route}:${model}`. */
 const LIVE_EFFORTS = new Map()
@@ -32,20 +28,26 @@ function resetLiveEfforts(route) {
   }
 }
 
-/** Return fresh capability metadata; omission preserves the provider default. */
+/** Return fresh capability metadata; every model advertises a selector. */
 function reasoningMetadata(route, model) {
   const live = LIVE_EFFORTS.get(`${route}:${model}`)
   if (live !== undefined) return { reasoning: { efforts: live.map(id => ({ id, name: LABELS[id] ?? id })) } }
+  // A model with no verified levels still gets the route's standard selector:
+  // the operator always chooses, and an unsupported pick fails loudly at the
+  // provider rather than silently hiding the control.
   let ids
-  if ((route === 'claude' && (CLAUDE_FIVE.has(model) || CLAUDE_FIVE_FAMILY.test(model)))
-    || (route === 'codex' && model === 'gpt-6-astra')) {
-    ids = ['low', 'medium', 'high', 'xhigh', 'max']
-  } else if (route === 'claude' && model === 'claude-sonnet-4-6') {
+  if (route === 'claude' && model === 'claude-sonnet-4-6') {
     ids = ['low', 'medium', 'high', 'max']
   } else if (route === 'codex' && CODEX_FOUR.has(model)) {
     ids = ['low', 'medium', 'high', 'xhigh']
+  } else if (route === 'codex' && model === 'gpt-6-astra') {
+    ids = ['low', 'medium', 'high', 'xhigh', 'max']
+  } else if (route === 'codex') {
+    ids = ['off', 'low', 'medium', 'high', 'xhigh', 'max']
+  } else {
+    ids = ['low', 'medium', 'high', 'xhigh', 'max']
   }
-  return ids === undefined ? {} : { reasoning: { efforts: ids.map(id => ({ id, name: LABELS[id] })) } }
+  return { reasoning: { efforts: ids.map(id => ({ id, name: LABELS[id] })) } }
 }
 
 /** Reject unsupported declared choices without changing the selected effort. */

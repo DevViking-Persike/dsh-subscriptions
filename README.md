@@ -61,7 +61,7 @@ Each backend accepts only the models its own CLI version knows: a request that i
 
 ## Model Experience
 
-The shipped catalogs include GPT-6 Astra (`gpt-6-astra`) and Claude Fable 5.1 (`claude-fable-5-1`), with text and image input. Availability still depends on the subscription. Both expose Low, Medium, High, Xhigh, and Ultra Code (`max`) in the Harness effort selector. Other known models expose their supported levels; unknown models and Haiku do not advertise a selector. Omitting effort preserves the provider default.
+The shipped catalogs include GPT-6 Astra (`gpt-6-astra`) and Claude Fable 5.1 (`claude-fable-5-1`), with text and image input. Availability still depends on the subscription. Both expose Low, Medium, High, Xhigh, and Ultra Code (`max`) in the Harness effort selector. Other known models expose their supported levels; an unknown or newly discovered model always advertises the route's standard selector (Claude: Low–Ultra Code; Codex: Off–Ultra Code), never none. Omitting effort preserves the provider default.
 
 Claude sends the selected value through `output_config.effort`; Codex uses `reasoning.effort`. Ultra Code is a display label, not an `ultracode` API value. Unsupported declared choices fail before credential access or provider I/O. Capabilities follow the [Astra model reference](https://developers.openai.com/api/docs/models/gpt-6-astra) and [Claude effort reference](https://platform.claude.com/docs/en/build-with-claude/effort). Changing top-level effort can affect prompt-cache reuse.
 
